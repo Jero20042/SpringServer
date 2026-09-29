@@ -2,8 +2,10 @@ package org.example.controllers.customers;
 
 import org.example.Entityes.Customer;
 import org.example.requests.UpdateCustomerBanalceRequest;
+import org.example.sqlOperations.SessionService;
 import org.example.sqlOperations.customer.CustomerOperation;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
@@ -14,18 +16,28 @@ import java.util.Map;
 @RestController
 public class UpdateCustomerBalanceController {
     private final CustomerOperation customerOperation = new CustomerOperation();
+    private final SessionService sessionService;
+    public UpdateCustomerBalanceController(SessionService sessionService) {
+        this.sessionService = sessionService;
+    }
     @PostMapping("updateBalance")
-    public ResponseEntity<?> updateBalance(@RequestBody UpdateCustomerBanalceRequest requestBody) throws SQLException {
+    public ResponseEntity<?> updateBalance(@RequestBody UpdateCustomerBanalceRequest requestBody, @CookieValue(value = "skey",required = true) String token) throws SQLException {
         try {
             Customer customer = getCustomerByLogin(requestBody.login());
-            if (customer.getBalance() + requestBody.amount() >= 0) {
-                customerOperation.updateCustomerBalance(customer, requestBody.amount());
-                System.out.println("Баланс пользователя обновлен");
-                return ResponseEntity.status(200).body(getCustomerByLogin(requestBody.login()));
+            if (sessionService.getLoginByToken(token).get().equals("admin")) {
+                if (customer.getBalance() + requestBody.amount() >= 0) {
+                    customerOperation.updateCustomerBalance(customer, requestBody.amount());
+                    System.out.println("Баланс пользователя обновлен");
+                    return ResponseEntity.status(200).body(getCustomerByLogin(requestBody.login()));
+                } else {
+                    return ResponseEntity
+                            .status(400)
+                            .body(Map.of("message", "Баланс не может быть отрицательным"));
+                }
             } else {
                 return ResponseEntity
-                        .status(400)
-                        .body(Map.of("message","Баланс не может быть отрицательным"));
+                        .status(403)
+                        .body(Map.of("message", "Отказно в проведении операции"));
             }
         } catch (Exception e) {
             System.out.println("Баланс не обновлен");
